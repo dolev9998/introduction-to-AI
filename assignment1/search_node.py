@@ -1,5 +1,6 @@
-
 class search_node():
+    __slots__ = ['state', 'g', 'h', 'f', 'prev']
+
     def __init__(self, state, g=0, h=0, prev=None):
         self.state = state
         self.g = g
@@ -7,10 +8,11 @@ class search_node():
         self.f = g + h
         self.prev = prev
 
-
     def __lt__(self, other):
-        return (self.f < other.f) or (self.f == other.f and self.h < other.h)
+        if self.f == other.f:
+            return self.h < other.h
+        
+        return self.f < other.f
 
     def get_neighbors(self):
         return self.state.get_neighbors()
-

@@ -1,65 +1,92 @@
-goal_state: list[int]
+GOAL_VISIBLE = []
 
 def init_goal_for_search(goal_blocks):
-    global goal_state
-    goal_state = []
-    goal_blocks_as_list = [x for x in goal_blocks.split(',')]
-    for i in range (len(goal_blocks_as_list)):
-        goal_state.append(int(goal_blocks_as_list[i]))
+    global GOAL_VISIBLE
+    GOAL_VISIBLE = []
+    
+    if goal_blocks:
+        split_values = goal_blocks.split(',')
+        for val in split_values:
+            GOAL_VISIBLE.append(int(val))
 
 class color_blocks_state:
-    # you can add global params
-    visible_in_state: list[int]
-    not_visible_in_state: list[int]
-    _hash: int
 
-    def __init__(self, blocks_str, **kwargs):
-        self.visible_in_state = list()
-        self.not_visible_in_state = list()
-        for pair in blocks_str.split("),"):
-            pair = pair.strip("()")
-            a,b = pair.split(",")
-            self.visible_in_state.append(a)
-            self.not_visible_in_state.append(b)
-        self._hash = hash((tuple(self.visible_in_state),tuple(self.not_visible_in_state)))
-        pass
+    def __init__(self, blocks_data, is_parsed=False):
+        if is_parsed:
+            self.state = blocks_data
+        else:
+
+            clean_str = blocks_data.replace('(', '').replace(')', '')
+            
+            if len(clean_str) == 0:
+                self.state = ()
+            else:
+                str_parts = clean_str.split(',')
+                nums = []
+                for s in str_parts:
+                    nums.append(int(s))
+                
+                pairs = []
+                for i in range(0, len(nums), 2):
+                    visible = nums[i]
+                    hidden = nums[i+1]
+                    pairs.append((visible, hidden))
+                
+                self.state = tuple(pairs)
 
     @staticmethod
-    def is_goal_state(_color_blocks_state: "color_blocks_state") :
-        return goal_state == _color_blocks_state.visible_in_state
-    
-    @classmethod
-    def _from_states(cls,visible_in_state,not_visible_in_state):
-        new_coler_blocks_state = object.__new__(color_blocks_state)
-        new_coler_blocks_state.visible_in_state = visible_in_state
-        new_coler_blocks_state.not_visible_in_state = not_visible_in_state
-        return new_coler_blocks_state
+    def is_goal_state(_state):
+        current_blocks = _state.state
         
+        if len(current_blocks) != len(GOAL_VISIBLE):
+            return False
+            
+        for i in range(len(current_blocks)):
+            if current_blocks[i][0] != GOAL_VISIBLE[i]:
+                return False
+                
+        return True
 
     def get_neighbors(self):
-        n = len(self.visible_in_state)
-        #spin
-        for i in range(n):
-            yield self._from_states(
-                [self.visible_in_state[:i] + [self.not_visible_in_state[i]] + self.visible_in_state[i+1:]],
-                [self.not_visible_in_state[:i] + [self.visible_in_state[i]] + self.not_visible_in_state[i+1:]])
+        neighbors_list = []
+        current_tuple = self.state
+        n = len(current_tuple)
+        # convert to list so we can modify it temporarily
+        temp_list = list(current_tuple)
 
-        #flip
         for i in range(n):
-            for j in range(i + 1, n):
-                yield self._from_states(
-                    [self.visible_in_state[:i] + self.visible_in_state[i:j+1][::-1] + self.visible_in_state[j+1:]]
-                    [self.not_visible_in_state[:i] + self.not_visible_in_state[i:j+1][::-1] + self.not_visible_in_state[j+1:]]
-                )
+            original_block = temp_list[i]
+            v = original_block[0]
+            h = original_block[1]
+            flipped_block = (h, v)
+            
+            temp_list[i] = flipped_block
 
-    # for debugging states
+            new_state = color_blocks_state(tuple(temp_list), is_parsed=True)
+            neighbors_list.append((new_state, 1))
+
+            temp_list[i] = original_block
+
+
+        for i in range(n - 1):
+
+            top_part = current_tuple[:i]
+
+            bottom_part = current_tuple[i:]
+            
+            reversed_bottom = bottom_part[::-1]
+            new_tuple = top_part + reversed_bottom
+            
+            new_state = color_blocks_state(new_tuple, is_parsed=True)
+            neighbors_list.append((new_state, 1))
+
+        return neighbors_list
+
     def get_state_str(self):
         return str(self.state)
 
-    def __eq__(self, other):
-        return isinstance(other, color_blocks_state) and self.visible_in_state == other.visible_in_state and self.not_visible_in_state == other.not_visible_in_state
     def __hash__(self):
-        return self._hash
+        return hash(self.state)
 
-
-    #you can add helper functions
+    def __eq__(self, other):
+        return self.state == other.state

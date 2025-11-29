@@ -3,7 +3,9 @@ from color_blocks_state import color_blocks_state
 import heapq
 
 def create_open_set():
-    return ([], {}) 
+    heap = []
+    lookup = {}
+    return (heap, lookup)
 
 
 def create_closed_set():
@@ -11,22 +13,27 @@ def create_closed_set():
 
 
 def add_to_open(vn, open_set):
-    priority_queue, states_dict = open_set
-    heapq.heappush(priority_queue, vn)
-    states_dict[vn.state.state] = vn
+    heap, lookup = open_set
+    heapq.heappush(heap, vn)
+    lookup[vn.state.state] = vn
+
 
 def open_not_empty(open_set):
-    return bool(open_set[0])
+    heap, _ = open_set
+    if len(heap) > 0:
+        return True
+    return False
 
 
 def get_best(open_set):
-    priority_queue, states_dict = open_set
+    heap, lookup = open_set
     
-    while priority_queue:
-        best_node = heapq.heappop(priority_queue)
-        state_tuple = best_node.state.state
-        if state_tuple in states_dict and states_dict[state_tuple] == best_node:
-            del states_dict[state_tuple]
+    while len(heap) > 0:
+        best_node = heapq.heappop(heap)
+        state_key = best_node.state.state
+      
+        if state_key in lookup and lookup[state_key] == best_node:
+            del lookup[state_key]
             return best_node
             
     return None
@@ -35,73 +42,79 @@ def get_best(open_set):
 def add_to_closed(vn, closed_set):
     closed_set[vn.state.state] = vn.g
 
-#returns False if curr_neighbor state not in open_set or has a lower g from the node in open_set
-#remove the node with the higher g from open_set (if exists)
+
 def duplicate_in_open(vn, open_set):
-    _ , states_dict = open_set
-    state_tuple = vn.state.state
+    _, lookup = open_set
+    state_key = vn.state.state
     
-    if state_tuple in states_dict:
-        exist_node = states_dict[state_tuple]    
-        if vn.g < exist_node.g:
+    if state_key in lookup:
+        existing_node = lookup[state_key]
+        
+      
+        if vn.g < existing_node.g:
             return False
         else:
             return True
-    
+            
     return False
 
 
-#returns False if curr_neighbor state not in closed_set or has a lower g from the node in closed_set
-#remove the node with the higher g from closed_set (if exists)
 def duplicate_in_closed(vn, closed_set):
-    state_tuple = vn.state.state
+    state_key = vn.state.state
     
-    if state_tuple in closed_set:
-        exist_g_cost = closed_set[state_tuple]    
-        if vn.g >= exist_g_cost:
+    if state_key in closed_set:
+        existing_g = closed_set[state_key]
+        
+        if vn.g >= existing_g:
             return True
         else:
-            del closed_set[state_tuple]
+            del closed_set[state_key]
             return False
-    
+            
     return False
 
 
-# helps to debug sometimes..
 def print_path(path):
-    for i in range(len(path)-1):
+    for i in range(len(path) - 1):
         print(f"[{path[i].state.get_state_str()}]", end=", ")
-    print(path[-1].state.state_str)
+    print(path[-1].state.get_state_str())
 
 
 def search(start_state, heuristic):
-
     open_set = create_open_set()
     closed_set = create_closed_set()
+    
     start_node = search_node(start_state, 0, heuristic(start_state))
     add_to_open(start_node, open_set)
 
     while open_not_empty(open_set):
-
+        
         current = get_best(open_set)
+
+        if current is None:
+            break
 
         if color_blocks_state.is_goal_state(current.state):
             path = []
-            while current:
-                path.append(current)
-                current = current.prev
+            temp = current
+            while temp is not None:
+                path.append(temp)
+                temp = temp.prev
+            
             path.reverse()
             return path
 
         add_to_closed(current, closed_set)
-
-        for neighbor, edge_cost in current.get_neighbors():
-            curr_neighbor = search_node(neighbor, current.g + edge_cost, heuristic(neighbor), current)
-            if not duplicate_in_open(curr_neighbor, open_set) and not duplicate_in_closed(curr_neighbor, closed_set):
-                add_to_open(curr_neighbor, open_set)
+        neighbors = current.get_neighbors()
+        for neighbor_state, cost in neighbors:
+            
+            new_g = current.g + cost
+            new_h = heuristic(neighbor_state)
+            neighbor_node = search_node(neighbor_state, new_g, new_h, current)
+            in_open = duplicate_in_open(neighbor_node, open_set)
+            in_closed = duplicate_in_closed(neighbor_node, closed_set)
+            
+            if not in_open and not in_closed:
+                add_to_open(neighbor_node, open_set)
 
     return None
-
-
-
-
